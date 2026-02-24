@@ -7,12 +7,23 @@ import variantRoutes from "./routes/variant.routes";
 import purchaseOrderRoutes from "./routes/purchaseOrder.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import { setupSwagger } from "./config/swagger";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+
 
 dotenv.config();
 
 const app = express();
 
 app.use(express.json());
+app.use(limiter);
+app.use(morgan("dev"));
 app.use("/api/orders", orderRoutes);
 app.use("/api/tenants", tenantRoutes);
 app.use("/api/variants", variantRoutes);
