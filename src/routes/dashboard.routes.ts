@@ -5,6 +5,22 @@ import { StockMovement } from "../models/StockMovement";
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/dashboard/{tenantId}/stock-graph:
+ *   get:
+ *     summary: Get stock movement data for last 7 days
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: path
+ *         name: tenantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Stock movement graph data
+ */
 router.get("/:tenantId/stock-graph", async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -39,6 +55,22 @@ router.get("/:tenantId/stock-graph", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/dashboard/{tenantId}/top-sellers:
+ *   get:
+ *     summary: Get top 5 selling variants in last 30 days
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: path
+ *         name: tenantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Top sellers returned
+ */
 router.get("/:tenantId/top-sellers", async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -70,6 +102,22 @@ router.get("/:tenantId/top-sellers", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/dashboard/{tenantId}/inventory-value:
+ *   get:
+ *     summary: Get total inventory value
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: path
+ *         name: tenantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Inventory value returned
+ */
 router.get("/:tenantId/inventory-value", async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -87,6 +135,22 @@ router.get("/:tenantId/inventory-value", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/dashboard/{tenantId}/low-stock:
+ *   get:
+ *     summary: Get low stock variants considering pending purchase orders
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: path
+ *         name: tenantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of low stock items
+ */
 router.get("/:tenantId/low-stock", async (req, res) => {
   try {
     const { tenantId } = req.params;

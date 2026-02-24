@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { connectDB } from "./config/db";
 import { Tenant } from "./models/Tenant";
 import { Variant } from "./models/Variant";
+import dotenv from "dotenv";
+dotenv.config();
 
 const seed = async () => {
   await connectDB();

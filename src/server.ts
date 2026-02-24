@@ -6,6 +6,7 @@ import tenantRoutes from "./routes/tenant.routes";
 import variantRoutes from "./routes/variant.routes";
 import purchaseOrderRoutes from "./routes/purchaseOrder.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
+import { setupSwagger } from "./config/swagger";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use("/api/tenants", tenantRoutes);
 app.use("/api/variants", variantRoutes);
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+setupSwagger(app);
 
 connectDB();
 
@@ -24,7 +26,7 @@ app.get("/", (req, res) => {
   res.send("Inventory API Running");
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
