@@ -41,5 +41,7 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "esModuleInterop": true
-  }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "client"]
 }

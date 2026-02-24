@@ -9,6 +9,7 @@ import dashboardRoutes from "./routes/dashboard.routes";
 import { setupSwagger } from "./config/swagger";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import cors from "cors";
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -23,6 +24,7 @@ const app = express();
 
 app.use(express.json());
 app.use(limiter);
+app.use(cors());
 app.use(morgan("dev"));
 app.use("/api/orders", orderRoutes);
 app.use("/api/tenants", tenantRoutes);

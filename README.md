@@ -1,6 +1,6 @@
 # Multi-Tenant Inventory Management System
 
-A SaaS backend platform where multiple businesses (tenants) independently manage:
+A full-stack SaaS platform where multiple businesses (tenants) independently manage:
 
 - Inventory
 - Product variants (SKUs)
@@ -16,57 +16,74 @@ Designed to handle real-world inventory complexities including concurrent operat
 
 ## Tech Stack
 
-- **Backend:** Node.js + Express
-- **Database:** MongoDB + Mongoose
-- **Language:** TypeScript
-- **Architecture:** Row-level multi-tenancy
+### Backend
+- Node.js + Express
+- MongoDB + Mongoose
+- TypeScript
+- Swagger (OpenAPI Documentation)
+
+### Frontend
+- React (Vite)
+- TypeScript
+- Axios
+- Recharts (Data Visualization)
+
+### Architecture
+Row-level multi-tenancy using `tenantId`.
 
 ---
 
 ## Architecture Overview
 
 ### Multi-Tenant Strategy
+
 Shared database with row-level isolation using `tenantId`.
 
-
 This ensures:
+
 - Logical isolation
 - Simpler deployment
-- Better scalability
+- Lower operational overhead
 - Efficient indexing
 
-See `ARCHITECTURE.md` for detailed explanation.
+See `ARCHITECTURE.md` for detailed explanation and trade-offs.
 
 ---
 
 ## Core Features
 
 ### 1. Product & Variant Management
+
 - Products modeled separately from variants
 - Each variant represents a unique SKU
 - Stock tracked at variant level
+- Reorder level supported
 
 ---
 
 ### 2. Concurrency-Safe Order Processing
+
 - Atomic stock deduction using `$inc` + `$gte`
 - Prevents negative stock
 - Race-condition safe
 - Logs all stock movements
+- Order cancellation restores stock correctly
 
 ---
 
 ### 3. Purchase Order Lifecycle
+
 Supports:
 
 DRAFT → SENT → CONFIRMED → RECEIVED
 
-
 Features:
+
 - Multiple items per PO
 - Partial delivery support
 - Over-receive prevention
 - Automatic stock increment on receipt
+- Smart stock reconciliation
 
 ---
 
@@ -78,22 +95,26 @@ effectiveStock = currentStock + pendingIncomingQty
 
 Alert triggered only if:
 
-effective stock <= reorder level
+effectiveStock <= reorderLevel
 
-Prevents false alerts when stock is already replenishing.
+Prevents false alerts when replenishment is already in progress.
 
 ---
 
 ### 5. Dashboard & Analytics
 
-Includes:
+Backend provides:
 
 - Inventory Value
 - Top 5 Sellers (Last 30 Days)
 - Stock Movement Graph (Last 7 Days)
 - Smart Low Stock Items
 
-All queries optimized using proper indexing.
+Frontend displays:
+
+- Clean dashboard UI
+- Real-time API integration
+- Data visualization using charts
 
 ---
 
@@ -105,70 +126,112 @@ Optimizations include:
 
 - Compound indexes on `tenantId`
 - Indexed date-based filtering
-- Aggregation pipelines instead of JS loops
+- Aggregation pipelines
 - Projection to reduce payload size
+- Efficient dashboard queries
 
 Dashboard endpoints designed to load in **< 2 seconds** under expected scale.
 
 ---
 
+## API Documentation
+
+Swagger UI available at:
+
+http://localhost:5000/api/docs
+
+Includes:
+
+- All endpoints
+- Request/response schemas
+- Interactive testing
+
+---
+
 ## Setup Instructions
 
-### Clone Repository
+### 1️⃣ Clone Repository
 
-```bash
-git clone <your-repo-url>
-cd multi-tenant-inventory
-npm install
-```
-MongoDB must be running on 
-`mongodb://127.0.0.1:27017`
+git clone https://github.com/NaiveDemon/multi-tenant-inventory-system  
+cd multi-tenant-inventory-system  
 
-```bash
-npm run dev
-```
+---
 
-Server runs on `http://localhost:5000`
+## Backend Setup
 
-To populate sample tenants and variants:
-```bash
-npm run seed
-```
+npm install  
+
+MongoDB must be running on:
+
+mongodb://127.0.0.1:27017
+
+### Create Environment File
+
+Create a `.env` file in the root directory, copy .env.example file and paste in it
+
+Start backend:
+
+npm run dev  
+
+Server runs at:
+
+http://localhost:5000  
+
+---
+
+## Seed Sample Data
+
+npm run seed  
 
 Creates:
 
 - 2 tenants
-- Sample variants for each tenant
+- Sample variants
+- Sample inventory data
 
 ---
 
-## Roles (Planned)
+## Frontend Setup
+
+Navigate to client folder:
+
+cd client  
+npm install  
+npm run dev  
+
+Frontend runs at:
+
+http://localhost:5173  
+
+Make sure backend is running before starting frontend.
+
+---
+
+## Roles (Planned for future)
 
 - OWNER  
 - MANAGER  
 - STAFF  
 
-Role-based enforcement can be added via middleware.
+Role-based enforcement can be implemented via middleware.
 
 ---
 
 ## Assumptions
 
 - Single MongoDB instance (no replica set)
-- Atomic operations used instead of full transactions
+- Atomic operations used instead of distributed transactions
 - Authentication layer simplified
-- Frontend not included
-
+- Local development environment
 
 ---
 
 ## Future Improvements
 
-- MongoDB Replica Set for transactions
-- Redis caching for dashboard
+- MongoDB Replica Set for multi-document transactions
+- Redis caching for dashboard queries
 - Sharding by `tenantId`
 - JWT authentication middleware
-- Background job processing
-- Deployment on cloud (Render / Vercel / AWS)
-
-
+- Background job processing (queues)
+- Cloud deployment (Render / AWS / Vercel)
+- CI/CD pipeline

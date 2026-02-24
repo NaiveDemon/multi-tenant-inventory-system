@@ -1,0 +1,49 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background: #f4f6f9;
+  color: #111827;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 30px;
+}
+
+.card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 18px;
+  color: #6b7280;
+}
+
+.value {
+  font-size: 32px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.list-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}

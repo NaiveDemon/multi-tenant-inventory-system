@@ -20,7 +20,6 @@ if (!poItem) {
   throw new Error("Invalid variant in PO");
 }
 
-// Type assertion to satisfy TS
 const orderedQty = poItem.orderedQty ?? 0;
 const receivedQty = poItem.receivedQty ?? 0;
 
