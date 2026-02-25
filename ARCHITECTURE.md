@@ -1,9 +1,22 @@
-Multi-Tenant Inventory Management System – Architecture
+# Multi-Tenant Inventory Management System – Architecture
 
-1. Multi-Tenancy Strategy
-Shared Database with Row-Level Isolation
+This document explains the architectural decisions taken while building the system, including trade-offs, reasoning, and scalability considerations.
 
-Each document across collections includes a tenantId field.
+The goal of this design was to balance:
+
+- Simplicity
+- Data integrity
+- Performance
+- Real-world inventory correctness
+- Scalability readiness
+
+---
+
+# 1. Multi-Tenancy Strategy
+
+## Shared Database with Row-Level Isolation
+
+Each document across all collections includes a `tenantId` field.
 
 Example:
 
@@ -13,87 +26,112 @@ Example:
   ...
 }
 
-Pros of this approach:
+### Why This Approach Was Chosen
 
-Simple to implement
+A shared database with row-level isolation was selected because:
 
-Efficient resource utilization
+- It minimizes operational complexity
+- It avoids provisioning separate databases per tenant
+- It allows efficient use of resources
+- It works naturally with MongoDB compound indexing
+- It simplifies deployment and scaling
 
-Easy to scale horizontally
+This approach is well-suited for SaaS systems with many small-to-medium tenants.
 
-Works well with MongoDB indexing
+---
 
-Lower operational complexity compared to separate DB per tenant
+### Pros
 
-Cons:
+- Simple to implement
+- Efficient memory and connection usage
+- Lower operational cost
+- Easier horizontal scaling
+- Index-friendly
+- No database-per-tenant overhead
 
-Logical isolation (not physical)
+---
 
-Requires strict enforcement of tenantId filtering in queries
+### Cons
 
+- Logical isolation (not physical isolation)
+- Requires strict query discipline
+- All queries must enforce `tenantId`
 
-All queries include tenantId
+---
 
-All indexes include tenantId
+### Enforcement Strategy
 
-Tenant context must be derived from authenticated user (in production)
+- All queries explicitly filter by `tenantId`
+- All indexes include `tenantId`
+- Tenant context must be derived from authenticated user (in production)
 
 Example:
 
 Variant.find({ tenantId: req.user.tenantId })
 
-2. Data Modeling Decisions
-Product & Variant Modeling
+This ensures data isolation at the application layer.
 
-Products and variants are separated:
+---
 
-Product → conceptual item
+# 2. Data Modeling Decisions
 
+## Product & Variant Separation
+
+Products and variants are modeled separately.
+
+Product → conceptual item  
 Variant → SKU-level stock unit
 
 Example:
 
-T-Shirt
-  ├── Size M, Red
-  ├── Size L, Red
-  ├── Size M, Blue
+T-Shirt  
+  ├── Size M, Red  
+  ├── Size L, Red  
+  ├── Size M, Blue  
 
 Each variant tracks:
 
-stock
+- stock
+- price
+- reorderLevel
 
-price
+---
 
-reorderLevel
+## Why Variants Are Not Embedded Inside Product
 
-Why Not Embed Variants Inside Product?
+Embedding variants inside Product documents was avoided because:
 
-Embedding variants would:
+- Atomic stock updates would become complex
+- Document size would grow quickly
+- Indexing nested variants is less efficient
+- High write contention if multiple variants update simultaneously
 
-Make atomic stock updates difficult
+Instead, a separate `Variant` collection allows:
 
-Increase document size
+- Atomic stock updates
+- Independent indexing
+- Better concurrency handling
+- Scalable SKU management
 
-Complicate indexing
+This aligns with high-write inventory systems.
 
-Increase write contention
+---
 
-Separate Variant collection allows:
+# 3. Concurrency & Data Integrity
 
-Atomic stock updates
-
-Efficient indexing
-
-Scalable SKU management
-
-3. Concurrency & Data Integrity
-Problem
+## Problem
 
 Two users attempt to purchase the last item simultaneously.
 
-Solution
+Without protection:
+- Stock could go negative
+- Data integrity could be compromised
 
-Atomic conditional update:
+---
+
+## Solution: Atomic Conditional Update
+
+Stock deduction uses:
 
 await Variant.updateOne(
   {
@@ -105,75 +143,114 @@ await Variant.updateOne(
     $inc: { stock: -quantity }
   }
 );
-Why This Works
 
-MongoDB guarantees document-level atomicity
+---
 
-$gte condition prevents negative stock
+## Why This Works
 
-Only one update succeeds if stock is low
+MongoDB guarantees document-level atomicity.
 
-Why Transactions Were Not Used
+- The `$gte` condition ensures stock is sufficient.
+- `$inc` executes atomically.
+- Only one request succeeds when stock is low.
 
-MongoDB transactions require replica set configuration.
+This prevents race conditions without using full transactions.
+
+---
+
+## Why Transactions Were Not Used
+
+MongoDB multi-document transactions require a replica set.
 
 For simplicity and local development:
 
-Atomic updates were used
+- Atomic single-document updates were used.
+- This covers the most critical integrity requirement (stock cannot go negative).
 
-In production, this system should run on a replica set with full transaction support
+In production:
 
-4. Stock Movement Tracking
+- System should run on a replica set.
+- Multi-document transactions can wrap order + stock movement updates.
 
-All stock changes are recorded in StockMovement.
+The design leaves room for upgrade without refactoring the core logic.
+
+---
+
+# 4. Stock Movement Tracking
+
+All stock changes are recorded in `StockMovement`.
 
 Types:
 
-SALE
+- SALE
+- PURCHASE
+- RETURN
+- ADJUSTMENT
 
-PURCHASE
+---
 
-RETURN
-
-ADJUSTMENT
+## Why Track Stock Movements Separately?
 
 Benefits:
 
-Audit trail
+- Full audit trail
+- Analytics-ready design
+- No hidden stock mutations
+- Easier debugging
+- Enables dashboard aggregation
 
-Analytics support
+Stock value is never silently changed.
 
-No “hidden” stock mutations
+Every change has traceability.
 
-Enables dashboard aggregation
+This mirrors real ERP systems.
 
-5. Purchase Order Lifecycle
+---
+
+# 5. Purchase Order Lifecycle
 
 States:
 
 DRAFT → SENT → CONFIRMED → RECEIVED
 
-Supports:
+---
 
-Multiple items per PO
+## Why State-Based Lifecycle?
 
-Partial deliveries
+- Reflects real procurement workflow
+- Prevents premature stock increments
+- Enables partial deliveries
 
-Over-receive prevention
+---
 
-Automatic stock increment on receipt
-
-Partial Delivery Handling
+## Partial Delivery Handling
 
 Each PO item tracks:
 
-orderedQty
-receivedQty
+- orderedQty
+- receivedQty
+
+Stock is incremented only when items are received.
 
 Status changes to RECEIVED only when:
 
 receivedQty === orderedQty (for all items)
-6. Smart Low-Stock Alerts
+
+---
+
+## Why This Matters
+
+Real-world suppliers often:
+
+- Deliver partially
+- Delay shipments
+- Send incorrect quantities
+
+The system models these realities instead of assuming ideal conditions.
+
+---
+
+# 6. Smart Low-Stock Alerts
 
 Low-stock logic considers incoming purchase orders.
 
@@ -183,118 +260,156 @@ effectiveStock = currentStock + pendingIncomingQty
 
 Where:
 
-pendingIncomingQty = orderedQty - receivedQty (for POs not RECEIVED)
+pendingIncomingQty = orderedQty - receivedQty  
+(for POs not in RECEIVED state)
 
 Alert triggered if:
 
 effectiveStock <= reorderLevel
 
-This prevents false alerts when stock is already replenishing.
+---
 
-7. Dashboard & Analytics
-Inventory Value
+## Why This Logic Was Implemented
+
+Naive systems trigger alerts based only on current stock.
+
+That causes false alerts when replenishment is already in progress.
+
+This approach:
+
+- Prevents unnecessary procurement
+- Reflects real supply-chain logic
+- Improves decision accuracy
+
+---
+
+# 7. Dashboard & Analytics
+
+## Inventory Value
+
 Sum(stock × price)
-Top 5 Sellers (30 days)
 
-Aggregation on StockMovement:
+---
 
-Filter SALE
+## Top 5 Sellers (Last 30 Days)
 
-Group by variantId
+Aggregation pipeline:
 
-Sort descending
+- Filter type = SALE
+- Filter by date range
+- Group by variantId
+- Sort descending
+- Limit 5
 
-Limit 5
+---
 
-Stock Movement Graph (7 days)
+## Stock Movement Graph (7 Days)
 
 Grouped by:
 
-Date
+- Date
+- Movement type
 
-Movement type
+---
 
-8. Performance Optimization
-Indexing Strategy
+## Why Use Aggregation Pipelines?
+
+- Offloads computation to MongoDB
+- Reduces application-layer processing
+- Avoids transferring unnecessary data
+- Scales better than JS loops
+
+---
+
+# 8. Performance Optimization
+
+Designed to support 10,000+ products per tenant.
+
+---
+
+## Indexing Strategy
 
 Indexes added on:
 
-tenantId (all collections)
+- tenantId (all collections)
+- { tenantId, productId }
+- { tenantId, createdAt }
+- { tenantId, type, createdAt } (StockMovement)
 
-{ tenantId, productId }
+---
 
-{ tenantId, createdAt }
+## Why Compound Indexes?
 
-{ tenantId, type, createdAt } (StockMovement)
+Because:
 
-Why?
+- tenantId is always filtered
+- Most queries are tenant-scoped
+- Date-based filtering is common
+- Aggregations depend on filtering first
 
-Prevent full collection scans
+This prevents full collection scans.
 
-Support 10,000+ product scale
+---
 
-Ensure dashboard loads < 2 seconds by :
+## Dashboard Performance (< 2 Seconds)
 
-* Proper indexing
+Achieved by:
 
-* Filtering by tenantId
+- Proper indexing
+- Filtering by tenantId
+- Filtering by date ranges
+- Using aggregation pipelines
+- Using projections
+- Avoiding unnecessary document hydration
+- Avoiding heavy JS computation
 
-* Filtering by date ranges
+---
 
-* Using aggregation pipelines
+# 9. Scalability Considerations
 
-* Avoiding large document transfer
+## Current Design
 
-* Using projections
+- Single MongoDB instance
+- Row-level tenant isolation
+- Atomic operations
 
-* Not computing in JavaScript loops unnecessarily
+---
 
-9. Scalability Considerations
-Current Design
+## Future Improvements
 
-Single MongoDB instance
+- Deploy MongoDB replica set (for transactions)
+- Enable sharding by tenantId
+- Introduce Redis caching for dashboard endpoints
+- Add background job queue for heavy aggregations
+- Implement event-driven stock processing
+- Add monitoring and observability
 
-Row-level tenant isolation
+The architecture allows incremental scaling without major redesign.
 
-Future Improvements
+---
 
-Deploy MongoDB replica set (for transactions)
+# 10. Security Considerations (Future)
 
-Enable sharding by tenantId
+- JWT-based authentication
+- Role-based access control
+- Request-level tenant validation
+- Input validation (Zod or similar)
+- Rate limiting
+- Audit logging
 
-Introduce caching (Redis) for dashboard endpoints
+---
 
-Background job queue for heavy aggregations
-
-
-11. Security Considerations (Future)
-
-JWT-based authentication
-
-Role-based access control
-
-Request-level tenant validation
-
-Input validation (Zod)
-
-Rate limiting
-
-Final Architecture Summary
+# Final Architecture Summary
 
 This system prioritizes:
 
-Data integrity
-
-Atomic stock updates
-
-Clear tenant isolation
-
-Auditability
-
-Real-world inventory logic
-
-Performance-conscious indexing
-
-Clean TypeScript typing
+- Data integrity
+- Atomic stock updates
+- Clear tenant isolation
+- Auditability
+- Real-world inventory correctness
+- Performance-conscious indexing
+- Scalable design
+- Clean TypeScript typing
 
 The design balances simplicity and correctness while leaving room for production-grade scaling.
